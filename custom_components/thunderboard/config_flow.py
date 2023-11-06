@@ -236,7 +236,7 @@ def new_options(
         SCAN_TIMEOUT_KEY: scan_timeout,
         MAX_CONNECTION_ATTEMPTS_KEY: max_connection_attempts,
         ADD_BLE_CALLBACK_KEY: add_ble_callback,
-        EVENT_DEBOUNCE_TIME_KEY: add_ble_callback
+        EVENT_DEBOUNCE_TIME_KEY: event_debounce_time
     }
 
 def options_data(user_input: dict[str, str]) -> dict[str, list[int]]:
