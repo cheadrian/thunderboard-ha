@@ -227,7 +227,6 @@ class ThunderboardBluetoothDeviceData:
     ):
         super().__init__()
         self.logger = logger
-        self._event = None
         self._client = None
         self._device = None
 
