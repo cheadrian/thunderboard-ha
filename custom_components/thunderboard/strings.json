@@ -20,46 +20,5 @@
       "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
       "unknown": "[%key:common::config_flow::error::unknown%]"
     }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "Thunderboard options",
-        "data": {
-          "scan_interval": "Custom sensor polling interval in seconds",
-          "keep_device_connected": "Keep the bluetooth conection active",
-          "scan_timeout": "How much time till consider timeout an connection attempt",
-          "max_connection_attempts": "Number of attempts to connect to device",
-          "add_ble_callback": "Add BLE callback when device advertises",
-          "event_debounce_time": "Minimum times between bluetooth advertises to trigger refresh"
-        },
-        "description": "Customize polling interval and conection."
-      }
-    }
-  },
-  "entity": {
-    "sensor": {
-      "power_source": {
-        "name": "Power source"
-      },
-      "uv_idx": {
-        "name": "UV Index"
-      },
-      "hall_field_strenght": {
-        "name": "Magnetic field strenght"
-      },
-      "digital_state_0": {
-        "name": "Digital state 0"
-      },
-      "digital_state_1": {
-        "name": "Digital state 1"
-      },
-      "btn_0": {
-        "name": "Button 0"
-      },
-      "btn_1": {
-        "name": "Button 1"
-      }
-    }
   }
 }

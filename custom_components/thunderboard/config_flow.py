@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
-from typing import Any, Mapping
+from typing import Any
 
 from .thunderboard_ble import ThunderboardBluetoothDeviceData, ThunderboardDevice
 from bleak import BleakError
@@ -15,25 +15,12 @@ from homeassistant.components.bluetooth import (
     async_discovered_service_info,
 )
 from homeassistant.config_entries import ConfigFlow
-from homeassistant import config_entries
 from homeassistant.const import CONF_ADDRESS
 from homeassistant.data_entry_flow import FlowResult
 
 from .const import (
     DOMAIN, 
     MFCT_ID, 
-    DEFAULT_SCAN_INTERVAL, 
-    SCAN_INTERVAL_KEY, 
-    KEEP_DEVICE_CONNECTED_KEY,
-    KEEP_DEVICE_CONNECTED,
-    SCAN_TIMEOUT_KEY,
-    SCAN_TIMEOUT,
-    MAX_CONNECTION_ATTEMPTS_KEY,
-    MAX_CONNECTION_ATTEMPTS,
-    ADD_BLE_CALLBACK_KEY,
-    ADD_BLE_CALLBACK,
-    EVENT_DEBOUNCE_TIME_KEY,
-    EVENT_DEBOUNCE_TIME
     )
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,7 +28,7 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclasses.dataclass
 class Discovery:
-    """A discovered bluetooth device."""
+    """ A discovered bluetooth device. """
 
     name: str
     discovery_info: BluetoothServiceInfo
@@ -49,7 +36,7 @@ class Discovery:
 
 
 def get_name(device: ThunderboardDevice) -> str:
-    """Generate name with model and identifier for device."""
+    """ Generate name with model and identifier for device. """
 
     name = device.friendly_name()
     if identifier := device.identifier:
@@ -57,15 +44,15 @@ def get_name(device: ThunderboardDevice) -> str:
     return name
 
 class ThunderboardDeviceUpdateError(Exception):
-    """Custom error class for device updates."""
+    """ Custom error class for device updates. """
 
 class ThunderboardConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Handle a config flow for Thunderboard."""
+    """ Handle a config flow for Thunderboard. """
 
     VERSION = 1
 
     def __init__(self) -> None:
-        """Initialize the config flow."""
+        """ Initialize the config flow. """
         self._discovered_device: Discovery | None = None
         self._discovered_devices: dict[str, Discovery] = {}
 
@@ -100,7 +87,7 @@ class ThunderboardConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfo
     ) -> FlowResult:
-        """Handle the bluetooth discovery step."""
+        """ Handle the bluetooth discovery step. """
         _LOGGER.debug("Discovered BT device: %s", discovery_info.address)
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
@@ -121,7 +108,7 @@ class ThunderboardConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_bluetooth_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Confirm discovery."""
+        """ Confirm discovery. """
         if user_input is not None:
             return self.async_create_entry(
                 title=self.context["title_placeholders"]["name"], data={}
@@ -133,16 +120,10 @@ class ThunderboardConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders=self.context["title_placeholders"],
         )
 
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> config_entries.OptionsFlow:
-        """Create the options flow."""
-        return OptionsFlowHandler(config_entry)
-
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle the user step to pick discovered device."""
+        """ Handle the user step to pick discovered device. """
         if user_input is not None:
             address = user_input[CONF_ADDRESS]
             await self.async_set_unique_id(address, raise_on_progress=False)
@@ -187,85 +168,4 @@ class ThunderboardConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_ADDRESS): vol.In(titles),
                 },
             ),
-        )
-
-def options_schema(
-    options: Mapping[str, Any] | None = None
-) -> dict[vol.Optional, type[str]]:
-    """Return options schema."""
-    options = options or {}
-    return {
-        vol.Required(
-            SCAN_INTERVAL_KEY,
-            default=options.get(SCAN_INTERVAL_KEY, DEFAULT_SCAN_INTERVAL),
-        ): int,
-        vol.Required(
-            KEEP_DEVICE_CONNECTED_KEY,
-            default=options.get(KEEP_DEVICE_CONNECTED_KEY, KEEP_DEVICE_CONNECTED),
-        ): bool,
-        vol.Required(
-            SCAN_TIMEOUT_KEY,
-            default=options.get(SCAN_TIMEOUT_KEY, SCAN_TIMEOUT),
-        ): int,
-        vol.Required(
-            MAX_CONNECTION_ATTEMPTS_KEY,
-            default=options.get(MAX_CONNECTION_ATTEMPTS_KEY, MAX_CONNECTION_ATTEMPTS),
-        ): int,
-        vol.Required(
-            ADD_BLE_CALLBACK_KEY,
-            default=options.get(ADD_BLE_CALLBACK_KEY, ADD_BLE_CALLBACK),
-        ): bool,
-        vol.Required(
-            EVENT_DEBOUNCE_TIME_KEY,
-            default=options.get(EVENT_DEBOUNCE_TIME_KEY, EVENT_DEBOUNCE_TIME),
-        ): int
-    }
-
-def new_options(
-    custom_polling_interval: int, 
-    keep_connect: bool, 
-    scan_timeout: int, 
-    max_connection_attempts: int,
-    add_ble_callback: bool,
-    event_debounce_time: int
-) -> dict[str, list[int]]:
-    """Create a standard options object."""
-    return {
-        SCAN_INTERVAL_KEY: custom_polling_interval, 
-        KEEP_DEVICE_CONNECTED_KEY: keep_connect,
-        SCAN_TIMEOUT_KEY: scan_timeout,
-        MAX_CONNECTION_ATTEMPTS_KEY: max_connection_attempts,
-        ADD_BLE_CALLBACK_KEY: add_ble_callback,
-        EVENT_DEBOUNCE_TIME_KEY: event_debounce_time
-    }
-
-def options_data(user_input: dict[str, str]) -> dict[str, list[int]]:
-    """Return options dict."""
-    return new_options(
-        user_input.get(SCAN_INTERVAL_KEY), 
-        user_input.get(KEEP_DEVICE_CONNECTED_KEY),
-        user_input.get(SCAN_TIMEOUT_KEY),
-        user_input.get(MAX_CONNECTION_ATTEMPTS_KEY),
-        user_input.get(ADD_BLE_CALLBACK_KEY),
-        user_input.get(EVENT_DEBOUNCE_TIME_KEY)
-    )
-
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Manage the options."""
-        if user_input is not None:
-            return self.async_create_entry(
-                title="", 
-                data=options_data(user_input)
-        )
-
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(options_schema(self.config_entry.options)),
         )
