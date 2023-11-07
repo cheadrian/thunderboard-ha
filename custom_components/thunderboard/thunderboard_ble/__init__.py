@@ -35,7 +35,7 @@ from .lights import (
 __version__ = "0.1.0"
 
 __all__ = [
-    "ThunderboardDevice"
+    "ThunderboardDevice",
     "ThunderboardSensor",
     "ThunderboardBinarySensor",
     "ThunderboardBluetoothDeviceData",
