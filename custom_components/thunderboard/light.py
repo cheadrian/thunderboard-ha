@@ -1,178 +1,157 @@
 """
 Thunderboard lights integration.
-Please note, this is experimental!
+
+The four RGB LEDs share their red, green and blue lines (UG309 3.4.8), so the lit LEDs always
+show one common colour. Each LED can still be switched on and off on its own, which is what
+the lights "RGB LED 0" to "RGB LED 3" do. Changing the colour of one of them changes the
+colour of every lit LED, and the all-LEDs light switches the four of them together.
 """
 from __future__ import annotations
-import logging
 
+from collections.abc import Mapping
 from typing import Any
-
-from .thunderboard_ble import (
-    ThunderboardLights, 
-    ThunderboardDevice, 
-    ThunderboardLightsController
-)
-
-_LOGGER = logging.getLogger(__name__)
 
 from homeassistant.components.light import (
     ATTR_BRIGHTNESS,
     ATTR_RGB_COLOR,
     ColorMode,
     LightEntity,
-    LightEntityFeature,
     LightEntityDescription,
 )
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant, callback
-from homeassistant.components.bluetooth import async_ble_device_from_address
-from homeassistant.helpers.device_registry import (
-    CONNECTION_BLUETOOTH,
-    DeviceInfo,
+from .coordinator import ThunderboardConfigEntry, ThunderboardCoordinator
+from .entity import ThunderboardEntity
+from .thunderboard_ble import (
+    ThunderboardLights,
+    normalize_rgb,
+    rgb_led_bit,
+    rgb_led_key,
 )
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import (
-    CoordinatorEntity,
-    DataUpdateCoordinator,
+from .thunderboard_ble.const import RGB_LED_COUNT, RGB_LED_MASK_ALL
+
+LIGHT_DESCRIPTION = LightEntityDescription(key=ThunderboardLights.RGB_LEDS_1)
+
+RGB_LED_DESCRIPTIONS: tuple[LightEntityDescription, ...] = tuple(
+    LightEntityDescription(
+        key=rgb_led_key(index),
+        translation_key="rgb_led",
+        translation_placeholders={"index": str(index)},
+    )
+    for index in range(RGB_LED_COUNT)
 )
 
-from bleak import BLEDevice
-
-from .const import (
-    DOMAIN, 
-    KEEP_DEVICE_CONNECTED_KEY,
-    KEEP_DEVICE_CONNECTED
-)
-
-LIGHTS_DESCRIPTIONS: dict[str, LightEntityDescription] = {
-    ThunderboardLights.RGB_LEDS_1: LightEntityDescription(
-        key=ThunderboardLights.RGB_LEDS_1,
-        translation_key=None,
-    ),
-}
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+    entry: ThunderboardConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the Thunderboard BLE lights control."""
-    address = entry.unique_id
-    assert address is not None
-    ble_device = async_ble_device_from_address(hass, address)
-    keep_connect = entry.options.get(KEEP_DEVICE_CONNECTED_KEY, KEEP_DEVICE_CONNECTED)
-    coordinator: DataUpdateCoordinator[ThunderboardDevice] = hass.data[DOMAIN][entry.entry_id]    
-    entities = []
-    _LOGGER.debug("Got led lights: %s", coordinator.data)
-
-    entities.append(
-        ThunderboardLightEntity(coordinator, coordinator.data, ble_device, keep_connect, LIGHTS_DESCRIPTIONS[ThunderboardLights.RGB_LEDS_1])
-    )
-
-    async_add_entities(entities)
-
-class ThunderboardLightEntity(
-    CoordinatorEntity[DataUpdateCoordinator[ThunderboardDevice]], LightEntity
-    ):
-    """Thunderboard BLE lights for the device."""
-
-    _attr_supported_color_modes = {ColorMode.RGB, ColorMode.BRIGHTNESS}
-    _attr_color_mode = ColorMode.RGB
-    _attr_has_entity_name = True
-    _attr_name = None
-    _attr_supported_features = LightEntityFeature.EFFECT
-    _attr_effect = None
-
-    def __init__(
-        self, 
-        coordinator: DataUpdateCoordinator[ThunderboardDevice],
-        thunderboard_device: ThunderboardDevice,
-        ble_device: BLEDevice,
-        keep_connect: bool,
-        entity_description: LightEntityDescription
-    ) -> None:
-        """Initialize an Thunderboard lights."""
-        super().__init__(coordinator)
-        self.entity_description = entity_description
-        self.ble_device = ble_device
-        self.controller = None
-        self.keep_connect = keep_connect
-        self.required_rgb = (255, 255, 255)
-        self.required_brightness = 255
-        
-        name = thunderboard_device.name
-        if identifier := thunderboard_device.identifier:
-            name += f" ({identifier})"
-        
-        self._attr_unique_id = f"{thunderboard_device.address}_{entity_description.key}"
-        self._attr_device_info = DeviceInfo(
-            connections={
-                (
-                    CONNECTION_BLUETOOTH,
-                    thunderboard_device.address,
-                )
-            },
-            name=name,
-            manufacturer=thunderboard_device.manufacturer,
-            hw_version=thunderboard_device.hw_version,
-            sw_version=thunderboard_device.sw_version,
-            model=thunderboard_device.model,
+    coordinator = entry.runtime_data
+    if coordinator.data.lights is not None:
+        async_add_entities(
+            [
+                ThunderboardLightEntity(coordinator),
+                *(
+                    ThunderboardRgbLedEntity(coordinator, index)
+                    for index in range(RGB_LED_COUNT)
+                ),
+            ]
         )
-        self._async_update_attrs()
 
-    @callback
-    def _async_update_attrs(self) -> None:
-        """Handle updating _attr values."""
-        # device = self._device
-        self._attr_rgb_color = self.coordinator.data.lights.rgb
-        self._attr_brightness = self.coordinator.data.lights.brightness
-        self._attr_is_on = self.coordinator.data.lights.power
-        _LOGGER.debug("RGB attr: %s, is on attr: %s", self._attr_rgb_color, self._attr_is_on)
 
-    async def _get_controller(self):
-        if self.controller is None:
-            self.controller = await ThunderboardLightsController.from_ble_device(_LOGGER, self.ble_device)
-        return self.controller
-    
-    def _update_coordinator_lights_state(self, state):
-        data = self.coordinator.data
-        data.lights = state
-        self.coordinator.async_set_updated_data(data)
+class ThunderboardLightBase(ThunderboardEntity, LightEntity):
+    """What the all-LEDs light and the light of one LED have in common: the colour."""
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Instruct the light to turn on."""
-        try:
-            light_controller = await self._get_controller()
-            self.required_rgb = kwargs.get(ATTR_RGB_COLOR, self.required_rgb)
-            self.required_brightness = kwargs.get(ATTR_BRIGHTNESS, self.required_brightness)
-            state = await light_controller.turn_all_on(rgb=self.required_rgb, brightness=self.required_brightness)
-            self._update_coordinator_lights_state(state)
-        except Exception as e:
-            _LOGGER.error(e)
-        
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Instruct the light to turn off."""
-        try:
-            light_controller = await self._get_controller()
-            state = await light_controller.turn_all_off()
-            self._update_coordinator_lights_state(state)
-        except Exception as e:
-            _LOGGER.error(e)
-
-    @callback
-    def _handle_coordinator_update(self, *args: Any) -> None:
-        """Handle data update."""
-        self._async_update_attrs()
-        self.async_write_ha_state()
-
-    async def async_added_to_hass(self) -> None:
-        return await super().async_added_to_hass()
+    _attr_supported_color_modes = {ColorMode.RGB}
+    _attr_color_mode = ColorMode.RGB
 
     @property
     def available(self) -> bool:
-        """Check if device and sensor is available in data."""
+        """The firmware turns the LEDs off when the connection is closed."""
         return (
             super().available
-            and self.keep_connect
+            and self.coordinator.keep_connect
+            and self.coordinator.data.lights is not None
         )
+
+    @property
+    def brightness(self) -> int | None:
+        """Return the brightness of the lit LEDs."""
+        lights = self.coordinator.data.lights
+        return None if lights is None else lights.brightness
+
+    @property
+    def rgb_color(self) -> tuple[int, int, int] | None:
+        """Return the colour of the lit LEDs, at full brightness."""
+        lights = self.coordinator.data.lights
+        return None if lights is None else lights.rgb
+
+    def _requested_colour(
+        self, kwargs: Mapping[str, Any]
+    ) -> tuple[tuple[int, int, int] | None, int | None]:
+        """The colour and brightness of a turn on call, None for what stays as it is."""
+        rgb = None
+        if ATTR_RGB_COLOR in kwargs:
+            lights = self.coordinator.data.lights
+            fallback = (255, 255, 255) if lights is None else lights.rgb
+            rgb = normalize_rgb(kwargs[ATTR_RGB_COLOR], fallback=fallback)
+        return rgb, kwargs.get(ATTR_BRIGHTNESS)
+
+
+class ThunderboardLightEntity(ThunderboardLightBase):
+    """The four RGB LEDs of the board together."""
+
+    _attr_name = None
+
+    def __init__(self, coordinator: ThunderboardCoordinator) -> None:
+        """Initialize the all-LEDs light."""
+        super().__init__(coordinator, LIGHT_DESCRIPTION.key)
+        self.entity_description = LIGHT_DESCRIPTION
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if any of the LEDs is on."""
+        lights = self.coordinator.data.lights
+        return None if lights is None else lights.is_on
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Instruct the light to turn all the LEDs on."""
+        rgb, brightness = self._requested_colour(kwargs)
+        await self.coordinator.async_update_lights(
+            on=RGB_LED_MASK_ALL, rgb=rgb, brightness=brightness
+        )
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Instruct the light to turn all the LEDs off."""
+        await self.coordinator.async_update_lights(off=RGB_LED_MASK_ALL)
+
+
+class ThunderboardRgbLedEntity(ThunderboardLightBase):
+    """One of the four RGB LEDs, numbered as in the user guide of the board."""
+
+    def __init__(self, coordinator: ThunderboardCoordinator, index: int) -> None:
+        """Initialize the light of one RGB LED."""
+        description = RGB_LED_DESCRIPTIONS[index]
+        super().__init__(coordinator, description.key)
+        self.entity_description = description
+        self._bit = rgb_led_bit(index)
+
+    @property
+    def is_on(self) -> bool | None:
+        """Return true if this LED is on."""
+        lights = self.coordinator.data.lights
+        return None if lights is None else bool(lights.mask & self._bit)
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Instruct the light to turn this LED on, the colour is shared with the other LEDs."""
+        rgb, brightness = self._requested_colour(kwargs)
+        await self.coordinator.async_update_lights(
+            on=self._bit, rgb=rgb, brightness=brightness
+        )
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Instruct the light to turn this LED off."""
+        await self.coordinator.async_update_lights(off=self._bit)

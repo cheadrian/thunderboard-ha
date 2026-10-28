@@ -1,7 +1,13 @@
 """
-From Simplicity Studio Thunderboard Sense 2 Demo project GATT definition: Bluetooth - SoC Thunderboard Sense 2
-Also https://github.com/SiliconLabs/EFRConnect-android/blob/master/mobile/src/main/java/com/siliconlabs/bledemo/Bluetooth/BLE/GattCharacteristic.kt
+GATT definitions of the Silicon Labs "Bluetooth - SoC Thunderboard" demo firmware.
+
+Taken from the Gecko SDK example app/bluetooth/example/bt_soc_thunderboard
+(the GATT database is identical in SDK 4.3.2 and 4.5.1) and from
+https://github.com/SiliconLabs/EFRConnect-android/blob/master/mobile/src/main/java/com/siliconlabs/bledemo/Bluetooth/BLE/GattCharacteristic.kt
 """
+
+# Services
+SERVICE_AUTOMATION_IO           = "00001815-0000-1000-8000-00805f9b34fb"
 
 # Power and battery
 CHARACTERISTIC_BATTERY          = "00002a19-0000-1000-8000-00805f9b34fb"
@@ -16,6 +22,10 @@ CHARACTERISTIC_SOUND_LEVEL      = "c8546913-bf02-45eb-8dde-9f8754f4a32e"
 CHARACTERISTIC_AMBIENT_LIGHT    = "c8546913-bfd9-45eb-8dde-9f8754f4a32e"
 CHARACTERISTIC_HALL_FIELD       = "f598dbc5-2f02-4ec5-9936-b3d1aa4f957f"
 
+# Indoor air quality, measured by the CCS811 and only available when powered over USB
+CHARACTERISTIC_ECO2             = "efd658ae-c401-ef33-76e7-91b00019103b"
+CHARACTERISTIC_TVOC             = "efd658ae-c402-ef33-76e7-91b00019103b"
+
 # Device information
 CHARACTERISTIC_DEVICE_NAME      = "00002a00-0000-1000-8000-00805f9b34fb"
 CHARACTERISTIC_APPEARANCE       = "00002a01-0000-1000-8000-00805f9b34fb"
@@ -26,13 +36,17 @@ CHARACTERISTIC_HARDWARE_REV     = "00002a27-0000-1000-8000-00805f9b34fb"
 CHARACTERISTIC_FIRMWARE_REV     = "00002a26-0000-1000-8000-00805f9b34fb"
 CHARACTERISTIC_SYSTEM_ID        = "00002a23-0000-1000-8000-00805f9b34fb"
 
-# RGB LEGS
+# RGB LEDs: 4 bytes, LED mask then red, green, blue. All LEDs of the mask share one colour,
+# the red, green and blue lines are common to the four LEDs (UG309 3.4.8). Bit i of the mask
+# enables "RGB LED i" of the user guide.
 CHARACTERISTIC_RGB_LEDS_1       = "fcb89c40-c603-59f3-7dc3-5ece444a401b"
+RGB_LED_COUNT                   = 4
+RGB_LED_MASK_ALL                = 0x0F
 
-# AIO DIGITAL
-CHARACTERISTIC_DIGITAL_STATE_0 = "00002a56-0000-1000-8000-00805f9b34fb"
-CHARACTERISTIC_HANDLE_DIGITAL_STATE_0 = 28
-CHARACTERISTIC_HANDLE_DIGITAL_STATE_1 = 33
+# Automation IO. The two characteristics share this UUID and are told apart by their properties:
+# aio_digital_in (read, notify) holds the buttons, aio_digital_out (read, write) the two LEDs.
+# Each signal uses 2 bits, the value 1 meaning active.
+CHARACTERISTIC_DIGITAL          = "00002a56-0000-1000-8000-00805f9b34fb"
 
 # Details
 # Power source
@@ -45,7 +59,7 @@ CHARACTERISTIC_HANDLE_DIGITAL_STATE_1 = 33
 
 # Hall Effect
 # State - Read, Notify - f598dbc5-2f01-4ec5-9936-b3d1aa4f957f
-# Field Strenght - Read, Notify - f598dbc5-2f02-4ec5-9936-b3d1aa4f957f
+# Field Strength - Read, Notify - f598dbc5-2f02-4ec5-9936-b3d1aa4f957f
 # Control Point - Write - f598dbc5-2f03-4ec5-9936-b3d1aa4f957f
 
 # IMU

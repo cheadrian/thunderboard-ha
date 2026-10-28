@@ -14,51 +14,80 @@
     },
     "abort": {
       "not_supported": "Device not supported",
-      "no_devices_found": "[%key:common::config_flow::abort::no_devices_found%]",
+      "no_devices_found": "No Thunderboard found nearby. Make sure the board is powered over USB and advertising.",
       "already_in_progress": "[%key:common::config_flow::abort::already_in_progress%]",
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]",
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]"
+      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
     }
   },
   "options": {
     "step": {
       "init": {
         "title": "Thunderboard options",
+        "description": "Customize polling interval and connection.",
         "data": {
-          "scan_interval": "Custom sensor polling interval in seconds",
-          "keep_device_connected": "Keep the bluetooth conection active",
-          "scan_timeout": "How much time till consider timeout an connection attempt",
-          "max_connection_attempts": "Number of attempts to connect to device",
-          "add_ble_callback": "Add BLE callback when device advertises",
-          "event_debounce_time": "Minimum times between bluetooth advertises to trigger refresh"
+          "scan_interval": "Polling interval",
+          "keep_device_connected": "Keep the Bluetooth connection open",
+          "scan_timeout": "Connection timeout",
+          "max_connection_attempts": "Connection attempts",
+          "add_ble_callback": "Refresh when the board advertises",
+          "event_debounce_time": "Minimum time between advertisement refreshes"
         },
-        "description": "Customize polling interval and conection."
+        "data_description": {
+          "scan_interval": "How often the values are read from the board.",
+          "keep_device_connected": "Required for the button presses and the LEDs, the board turns its LEDs off when the connection closes.",
+          "scan_timeout": "How long to try connecting to the board, all attempts included.",
+          "max_connection_attempts": "Number of attempts to connect to the board.",
+          "add_ble_callback": "Read the board as soon as it advertises again, for example after it restarted.",
+          "event_debounce_time": "Limits how often the advertisements of the board trigger a refresh."
+        }
       }
     }
   },
   "entity": {
     "sensor": {
       "power_source": {
-        "name": "Power source"
+        "name": "Power source",
+        "state": {
+          "usb": "USB",
+          "aa": "AA batteries",
+          "aaa": "AAA batteries",
+          "cr2032": "CR2032 coin cell",
+          "unknown": "Unknown"
+        }
       },
       "uv_idx": {
-        "name": "UV Index"
+        "name": "UV index"
       },
-      "hall_field_strenght": {
-        "name": "Magnetic field strenght"
+      "hall_field_strength": {
+        "name": "Magnetic field strength"
       },
-      "digital_state_0": {
-        "name": "Digital state 0"
+      "eco2": {
+        "name": "eCO2"
       },
-      "digital_state_1": {
-        "name": "Digital state 1"
-      },
+      "tvoc": {
+        "name": "TVOC"
+      }
+    },
+    "binary_sensor": {
       "btn_0": {
         "name": "Button 0"
       },
       "btn_1": {
         "name": "Button 1"
+      },
+      "led_0": {
+        "name": "User LED 0"
+      },
+      "led_1": {
+        "name": "User LED 1"
+      },
+      "connection": {
+        "name": "Connection"
+      }
+    },
+    "light": {
+      "rgb_led": {
+        "name": "RGB LED {index}"
       }
     }
   }
